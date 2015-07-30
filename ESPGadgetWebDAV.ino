@@ -354,6 +354,60 @@ void loop() {
                 }
               }
               dataFile.close();
+           } else if (strstr(request_line, "MOVE ") != 0) {
+               char *destination = readDestination(client);
+              
+               Serial.println(destination);
+               if (strncmp(destination,"http",4) == 0) {
+                   destination = strstr(destination,"//");
+                   destination = strstr(destination+2,"/");
+               }
+               filename = filename + 1;
+               destination = destination + 1;
+               Serial.println(destination);
+               if (FS.rename(filename, destination)) {
+                   client.println(HTTP_201_MOVED);
+               } else {
+                   client.println(HTTP_NOT_FOUND);
+               }
+               client.println();
+               
+               break;
+           
+            } else if (strstr(request_line, "PUT ") != 0) {
+               unsigned long content_length = readContentLength(client);
+               readUntilBody(client);
+               filename = filename + 1;
+               FSFile dataFile = FS.open(filename, FSFILE_WRITE);
+               byte buf[150];
+               int  num_read = 0;
+               unsigned long total_read = 0;
+               while (total_read < content_length) {
+                   num_read=client.read(buf,150);
+                   if (num_read > 0) {
+                       dataFile.write(buf,num_read);
+                       total_read = total_read + num_read;
+                   } else {
+                       delay(1);
+                   }
+               }
+               dataFile.close();
+               client.println(HTTP_201_CREATED);
+               client.println();
+               break;
+            } else if (strstr(request_line, "DELETE ") != 0) {
+               FSFile dataFile = FS.open(filename, FSFILE_WRITE);
+               if (! dataFile) {
+                   not_found_404(client);
+                   break;
+               }
+               if (dataFile.remove()) {
+                  client.println(HTTP_204_NO_CONTENT);
+                  client.println();
+               } else {
+                   not_found_404(client);
+               }
+               dataFile.close();
            } else if (strstr(request_line, "OPTIONS ") != 0) {
               client.println(HTTP_200_FOUND);
               client.println(HTTP_OPTIONS_HEADERS);

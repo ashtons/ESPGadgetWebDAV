@@ -1,9 +1,10 @@
 # ESPGadgetWebDAV
 WebDAV server running on an ESP8266 wifi module
 
-In development, currently supports basic PROPFIND and GET requests
+In development, currently supports basic PROPFIND, MOVE, PUT and GET requests
 
-Uses SPIFFS filesystem, formats filesystem on initial run
+Uses SPIFFS filesystem, formats filesystem on initial run.
+Doesn't support folders, only files in the root folder
 
 Tested on ESP8266-01, with 1MB flash 
 

@@ -1,9 +1,9 @@
 
 #include <ESP8266WiFi.h>
-#include <WiFiClient.h> 
+#include <WiFiClient.h>
 #include <EEPROM.h>
 
-#define FLASH_TEXT(name)   const char *name 
+#define FLASH_TEXT(name)   const char *name
 #define BUFFER_SIZE 110
 #define MAX_STRING 60
 
@@ -75,60 +75,60 @@ static char *str_replace(char *input, char *match, const char *substitute)
 }
 
 void ListFiles(WiFiClient client, const char *folderPath, FSFile folder, int format) {
-  client.println(MULTISTATUS_START);
-  folder.rewindDirectory();
-  while (true) {
-    FSFile entry =  folder.openNextFile();
-    if (! entry) {
-      folder.rewindDirectory();
-      break;
-    }
-    client.print(RESPONSE_START);
-    client.print(HREF_START);
-    client.print(folderPath);
-    client.print(entry.name());
-    //entry.printName(&client);
-    client.print(HREF_END);
-    client.print(PROPSTAT_START);
-    client.print(PROP_START);
-    if (entry.isDirectory()) {
-      client.print(RESOURCETYPE_START);
-      client.print(RESOURCE_COLLECTION);
-      client.print(RESOURCETYPE_END);
-    } else {
-      client.print(CONTENTLEN_START);
-      client.print(entry.size(), DEC);
-      client.print(CONTENTLEN_END);
-    }
-    client.print(MODDATE_START);
-    //entry.printModifyDateTime(&client);
-    client.print(MODDATE_END);
-    client.print(CREATEDATE_START);
-    //entry.printCreateDateTime(&client);
-    client.print(CREATEDATE_END);
-    client.print(PROP_END);
-    client.print(STATUS_OK);
-    client.print(PROPSTAT_END);
-    client.print(RESPONSE_END);
+    client.println(MULTISTATUS_START);
+    folder.rewindDirectory();
+    while (true) {
+        FSFile entry =  folder.openNextFile();
+        if (!entry) {
+            folder.rewindDirectory();
+            break;
+        }
+        client.print(RESPONSE_START);
+        client.print(HREF_START);
+        client.print(folderPath);
+        client.print(entry.name());
+        //entry.printName(&client);
+        client.print(HREF_END);
+        client.print(PROPSTAT_START);
+        client.print(PROP_START);
+        if (entry.isDirectory()) {
+            client.print(RESOURCETYPE_START);
+            client.print(RESOURCE_COLLECTION);
+            client.print(RESOURCETYPE_END);
+        } else {
+            client.print(CONTENTLEN_START);
+            client.print(entry.size(), DEC);
+            client.print(CONTENTLEN_END);
+        }
+        client.print(MODDATE_START);
+        //entry.printModifyDateTime(&client);
+        client.print(MODDATE_END);
+        client.print(CREATEDATE_START);
+        //entry.printCreateDateTime(&client);
+        client.print(CREATEDATE_END);
+        client.print(PROP_END);
+        client.print(STATUS_OK);
+        client.print(PROPSTAT_END);
+        client.print(RESPONSE_END);
 
-    entry.close();
+        entry.close();
 
-  }
-  client.println(MULTISTATUS_END);
+    }
+    client.println(MULTISTATUS_END);
 
 }
 
 
 
 void not_found_404(WiFiClient client) {
-  client.println(HTTP_NOT_FOUND);
-  client.println(HTTP_HTML_CONTENT);
-  client.println();
+    client.println(HTTP_NOT_FOUND);
+    client.println(HTTP_HTML_CONTENT);
+    client.println();
 }
 
 void not_allowed_405(WiFiClient client) {
-  client.println(HTTP_405_METHOD_NOT_ALLOWED);
-  client.println();
+    client.println(HTTP_405_METHOD_NOT_ALLOWED);
+    client.println();
 }
 
 unsigned long readNextLongValue(WiFiClient client) {
@@ -145,7 +145,7 @@ unsigned long readNextLongValue(WiFiClient client) {
             }
             continue;
         } else if (c == '\r') {
-            client.read(); //\n
+            client.read();                         //\n
             break;
         }
     }
@@ -159,7 +159,7 @@ unsigned long readContentLength(WiFiClient client) {
     byte index = 0;
     char needle[] = "ngth:";
     byte len = strlen(needle);
-    while(client.connected()) { 
+    while(client.connected()) {
         char c = client.read();
         if (c == needle[0] && index == 0) {
             index = 1;
@@ -182,15 +182,15 @@ char *readToEndOfLine(WiFiClient client) {
     byte index = 0;
     index = 0;
     while(client.connected()) {
-       char c = client.read();
-       if (c != '\n' && c != '\r') {
-           currentLineBuffer[index] = c;
-           index++;
-           continue;
-       } else {
-           currentLineBuffer[index] = 0;
-           break;
-       }
+        char c = client.read();
+        if (c != '\n' && c != '\r') {
+            currentLineBuffer[index] = c;
+            index++;
+            continue;
+        } else {
+            currentLineBuffer[index] = 0;
+            break;
+        }
     }
     return currentLineBuffer;
 }
@@ -199,7 +199,7 @@ char *readDestination(WiFiClient client) {
     byte index = 0;
     char needle[] = "tion:";
     byte len = strlen(needle);
-    while(client.connected()) { 
+    while(client.connected()) {
         char c = client.read();
         if (c == needle[0] && index == 0) {
             index = 1;
@@ -215,14 +215,14 @@ char *readDestination(WiFiClient client) {
             index = 0;
         }
     }
-    client.read(); //space
+    client.read();         //space
     return readToEndOfLine(client);
 }
 
 void readUntilBody(WiFiClient client) {
     //Read until \r\n\r\n
     byte index = 0;
-    while(client.connected()) { 
+    while(client.connected()) {
         char c = client.read();
         if (c == '\r' && index == 0) {
             index = 1;
@@ -236,24 +236,24 @@ void readUntilBody(WiFiClient client) {
             index = 0;
         }
     }
-    
+
 }
 
 void setup() {
     delay(1000);
     Serial.begin(115200);
     Serial.println("Started");
-	Serial.println(default_ssid);
+    Serial.println(default_ssid);
     Serial.println(default_password);
-    
-	WiFi.softAP(default_ssid, default_password);
 
-	while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print(".");}
+    WiFi.softAP(default_ssid, default_password);
 
-	IPAddress myIP = WiFi.softAPIP();
-	Serial.print("AP IP address: ");
-	Serial.println(myIP);
-	server.begin();
+    while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+
+    IPAddress myIP = WiFi.softAPIP();
+    Serial.print("AP IP address: ");
+    Serial.println(myIP);
+    server.begin();
     Serial.println("Server started.");
     EEPROM.begin(512);
     byte firstInstall = 0;
@@ -273,154 +273,154 @@ void setup() {
         Serial.println("Not first install, don't format");
     }
     Serial.print("###### Total bytes: ");
-    Serial.println(FS.totalBytes());    
+    Serial.println(FS.totalBytes());
     Serial.print("###### Used bytes: ");
-    Serial.println(FS.usedBytes()); 
-    ESP.wdtDisable(); //Disable watchdog timer
+    Serial.println(FS.usedBytes());
+    ESP.wdtDisable();         //Disable watchdog timer
 }
 
 void loop() {
-	char request_line[BUFFER_SIZE];
-  int index = 0;
-  WiFiClient client = server.available();
-  if (client) {
-    index = 0;
-    while (client.connected()) {
-      if (client.available()) {
-          char c = client.read();
-          if (c != '\n' && c != '\r') {
-              request_line[index] = c;
-              index++;
-              if (index >= BUFFER_SIZE) {
-                index = BUFFER_SIZE - 1;
-              }
-              continue;
-           }
-           request_line[index] = 0;
-           Serial.println(request_line);
-           //Serial.println(request_line);
-           (strstr(request_line, " HTTP"))[0] = 0;
-           char *decodedRequest = str_replace(request_line,"%20"," ");
-           //GET /folder/test.txt HTTP/1.1
-           char *filename =  strcpy(decodedRequest,strstr(decodedRequest, " ")+1);
-           Serial.println(filename);
-            if (strstr(request_line, "PROPFIND ") != 0) {
-              //curl --data "" --header "depth:1"  --header "Content-Type: text/xml" --request PROPFIND http://192.168.4.1/
-              FSFile dataFile = FS.open(filename, FSFILE_READ);
-              if (! dataFile) {
-                not_found_404(client);
-                break;
-              }
-              if (dataFile.isDirectory()) {
-                client.println(HTTP_207_FOUND);
-                client.println(HTTP_XML_CONTENT);
-                client.println("");
-                ListFiles(client, filename, dataFile, 0);
-              } else {
-                not_allowed_405(client);
-              }
-              dataFile.close();
-            } else if (strstr(request_line, "GET ") != 0) {
-              filename = filename + 1;
-              Serial.println(filename);
-              FSFile dataFile = FS.open(filename, FSFILE_READ);
-              if (! dataFile) {
-                not_found_404(client);
-                break;
-              }
-              if (dataFile.isDirectory()) {
-                ListFiles(client, filename, dataFile, 1);
-              } else {
-                client.println(HTTP_200_FOUND);
-                client.print(HTTP_CONTENT_TYPE);
-                if (strstr(request_line, ".jpg") != 0) {
-                  client.println(MIME_JPEG);
-                } else if (strstr(request_line, ".png") != 0) {
-                  client.println(MIME_PNG);
-                } else if (strstr(request_line, ".txt") != 0) {
-                  client.println(MIME_TXT);
+    char request_line[BUFFER_SIZE];
+    int index = 0;
+    WiFiClient client = server.available();
+    if (client) {
+        index = 0;
+        while (client.connected()) {
+            if (client.available()) {
+                char c = client.read();
+                if (c != '\n' && c != '\r') {
+                    request_line[index] = c;
+                    index++;
+                    if (index >= BUFFER_SIZE) {
+                        index = BUFFER_SIZE - 1;
+                    }
+                    continue;
+                }
+                request_line[index] = 0;
+                Serial.println(request_line);
+                //Serial.println(request_line);
+                (strstr(request_line, " HTTP"))[0] = 0;
+                char *decodedRequest = str_replace(request_line,"%20"," ");
+                //GET /folder/test.txt HTTP/1.1
+                char *filename =  strcpy(decodedRequest,strstr(decodedRequest, " ")+1);
+                Serial.println(filename);
+                if (strstr(request_line, "PROPFIND ") != 0) {
+                    //curl --data "" --header "depth:1"  --header "Content-Type: text/xml" --request PROPFIND http://192.168.4.1/
+                    FSFile dataFile = FS.open(filename, FSFILE_READ);
+                    if (!dataFile) {
+                        not_found_404(client);
+                        break;
+                    }
+                    if (dataFile.isDirectory()) {
+                        client.println(HTTP_207_FOUND);
+                        client.println(HTTP_XML_CONTENT);
+                        client.println("");
+                        ListFiles(client, filename, dataFile, 0);
+                    } else {
+                        not_allowed_405(client);
+                    }
+                    dataFile.close();
+                } else if (strstr(request_line, "GET ") != 0) {
+                    filename = filename + 1;
+                    Serial.println(filename);
+                    FSFile dataFile = FS.open(filename, FSFILE_READ);
+                    if (!dataFile) {
+                        not_found_404(client);
+                        break;
+                    }
+                    if (dataFile.isDirectory()) {
+                        ListFiles(client, filename, dataFile, 1);
+                    } else {
+                        client.println(HTTP_200_FOUND);
+                        client.print(HTTP_CONTENT_TYPE);
+                        if (strstr(request_line, ".jpg") != 0) {
+                            client.println(MIME_JPEG);
+                        } else if (strstr(request_line, ".png") != 0) {
+                            client.println(MIME_PNG);
+                        } else if (strstr(request_line, ".txt") != 0) {
+                            client.println(MIME_TXT);
+                        } else {
+                            client.println(MIME_BIN);
+                        }
+                        client.print(HTTP_CONTENT_LENGTH);
+                        client.print(dataFile.size(), DEC);
+                        client.println();
+                        client.println();
+                        char buf[42];
+                        int16_t num_read;
+                        while (dataFile.available()) {
+                            num_read = dataFile.read(buf, 42);
+                            client.write(&buf[0], 42);
+                        }
+                    }
+                    dataFile.close();
+                } else if (strstr(request_line, "MOVE ") != 0) {
+                    char *destination = readDestination(client);
+
+                    Serial.println(destination);
+                    if (strncmp(destination,"http",4) == 0) {
+                        destination = strstr(destination,"//");
+                        destination = strstr(destination+2,"/");
+                    }
+                    filename = filename + 1;
+                    destination = destination + 1;
+                    Serial.println(destination);
+                    if (FS.rename(filename, destination)) {
+                        client.println(HTTP_201_MOVED);
+                    } else {
+                        client.println(HTTP_NOT_FOUND);
+                    }
+                    client.println();
+
+                    break;
+
+                } else if (strstr(request_line, "PUT ") != 0) {
+                    unsigned long content_length = readContentLength(client);
+                    readUntilBody(client);
+                    filename = filename + 1;
+                    FSFile dataFile = FS.open(filename, FSFILE_WRITE);
+                    byte buf[150];
+                    int num_read = 0;
+                    unsigned long total_read = 0;
+                    while (total_read < content_length) {
+                        num_read=client.read(buf,150);
+                        if (num_read > 0) {
+                            dataFile.write(buf,num_read);
+                            total_read = total_read + num_read;
+                        } else {
+                            delay(1);
+                        }
+                    }
+                    dataFile.close();
+                    client.println(HTTP_201_CREATED);
+                    client.println();
+                    break;
+                } else if (strstr(request_line, "DELETE ") != 0) {
+                    FSFile dataFile = FS.open(filename, FSFILE_WRITE);
+                    if (!dataFile) {
+                        not_found_404(client);
+                        break;
+                    }
+                    if (dataFile.remove()) {
+                        client.println(HTTP_204_NO_CONTENT);
+                        client.println();
+                    } else {
+                        not_found_404(client);
+                    }
+                    dataFile.close();
+                } else if (strstr(request_line, "OPTIONS ") != 0) {
+                    client.println(HTTP_200_FOUND);
+                    client.println(HTTP_OPTIONS_HEADERS);
+                    client.println();
                 } else {
-                  client.println(MIME_BIN);
+                    not_allowed_405(client);
                 }
-                client.print(HTTP_CONTENT_LENGTH);
-                client.print(dataFile.size(), DEC);
-                client.println();
-                client.println();
-                char buf[42];
-                int16_t  num_read;
-                while (dataFile.available()) {
-                  num_read = dataFile.read(buf, 42);
-                  client.write(&buf[0], 42);
-                }
-              }
-              dataFile.close();
-           } else if (strstr(request_line, "MOVE ") != 0) {
-               char *destination = readDestination(client);
-              
-               Serial.println(destination);
-               if (strncmp(destination,"http",4) == 0) {
-                   destination = strstr(destination,"//");
-                   destination = strstr(destination+2,"/");
-               }
-               filename = filename + 1;
-               destination = destination + 1;
-               Serial.println(destination);
-               if (FS.rename(filename, destination)) {
-                   client.println(HTTP_201_MOVED);
-               } else {
-                   client.println(HTTP_NOT_FOUND);
-               }
-               client.println();
-               
-               break;
-           
-            } else if (strstr(request_line, "PUT ") != 0) {
-               unsigned long content_length = readContentLength(client);
-               readUntilBody(client);
-               filename = filename + 1;
-               FSFile dataFile = FS.open(filename, FSFILE_WRITE);
-               byte buf[150];
-               int  num_read = 0;
-               unsigned long total_read = 0;
-               while (total_read < content_length) {
-                   num_read=client.read(buf,150);
-                   if (num_read > 0) {
-                       dataFile.write(buf,num_read);
-                       total_read = total_read + num_read;
-                   } else {
-                       delay(1);
-                   }
-               }
-               dataFile.close();
-               client.println(HTTP_201_CREATED);
-               client.println();
-               break;
-            } else if (strstr(request_line, "DELETE ") != 0) {
-               FSFile dataFile = FS.open(filename, FSFILE_WRITE);
-               if (! dataFile) {
-                   not_found_404(client);
-                   break;
-               }
-               if (dataFile.remove()) {
-                  client.println(HTTP_204_NO_CONTENT);
-                  client.println();
-               } else {
-                   not_found_404(client);
-               }
-               dataFile.close();
-           } else if (strstr(request_line, "OPTIONS ") != 0) {
-              client.println(HTTP_200_FOUND);
-              client.println(HTTP_OPTIONS_HEADERS);
-              client.println();
-          } else {
-              not_allowed_405(client);
-          }
-          break;
-           
-      }
-      
+                break;
+
+            }
+
+        }
+        delay(1);
+        client.stop();
     }
-    delay(1);
-    client.stop();
-  }
 }

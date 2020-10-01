@@ -1,6 +1,7 @@
 
-#include <ESP8266WiFi.h>
-#include <WiFiClient.h>
+#include "FS.h"
+#include "SPIFFS.h"
+#include "WiFi.h"
 #include <EEPROM.h>
 
 #define FLASH_TEXT(name)   const char *name
@@ -74,18 +75,19 @@ static char *str_replace(char *input, char *match, const char *substitute)
     return replaceBuffer;
 }
 
-void ListFiles(WiFiClient client, const char *folderPath, FSFile folder, int format) {
-    client.println(MULTISTATUS_START);
-    folder.rewindDirectory();
-    while (true) {
-        FSFile entry =  folder.openNextFile();
-        if (!entry) {
-            folder.rewindDirectory();
-            break;
-        }
+void ListFiles(WiFiClient client, const char *folderPath, File folder, int format) {
+    Serial.println("Getting list of files");
+    Serial.println(folderPath);
+    client.println(MULTISTATUS_START);    
+    File root = SPIFFS.open("/");
+    File entry = root.openNextFile();
+    if (!entry) {
+            Serial.println("No files found");
+    }
+    while (entry) {        
         client.print(RESPONSE_START);
         client.print(HREF_START);
-        client.print(folderPath);
+        //client.print(folderPath);
         client.print(entry.name());
         //entry.printName(&client);
         client.print(HREF_END);
@@ -112,7 +114,7 @@ void ListFiles(WiFiClient client, const char *folderPath, FSFile folder, int for
         client.print(RESPONSE_END);
 
         entry.close();
-
+        entry = root.openNextFile();
     }
     client.println(MULTISTATUS_END);
 
@@ -245,10 +247,14 @@ void setup() {
     Serial.println("Started");
     Serial.println(default_ssid);
     Serial.println(default_password);
-
+    if(!SPIFFS.begin(true)){
+      Serial.println("An Error has occurred while mounting SPIFFS");
+      return;
+    }
+   
     WiFi.softAP(default_ssid, default_password);
 
-    while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+    //while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
 
     IPAddress myIP = WiFi.softAPIP();
     Serial.print("AP IP address: ");
@@ -258,25 +264,24 @@ void setup() {
     EEPROM.begin(512);
     byte firstInstall = 0;
     EEPROM.get( 0, firstInstall );
-    FS.mount();
     if (firstInstall != 128) {
         Serial.println("First install, formatting filesystem");
-        FS.format();
+        SPIFFS.format();
         firstInstall = 128;
         EEPROM.put(0,firstInstall);
         EEPROM.commit();
-        Serial.println("File system formatted");
-        FSFile dataFile = FS.open("test.txt", FSFILE_WRITE);
-        dataFile.write("Hello World!\r\n");
+        Serial.println("File system formatted");       
+        File dataFile = SPIFFS.open("test.txt", "w");
+        dataFile.print("Hello World!");
         dataFile.close();
     } else {
         Serial.println("Not first install, don't format");
     }
     Serial.print("###### Total bytes: ");
-    Serial.println(FS.totalBytes());
+    Serial.println(SPIFFS.totalBytes());
     Serial.print("###### Used bytes: ");
-    Serial.println(FS.usedBytes());
-    ESP.wdtDisable();         //Disable watchdog timer
+    Serial.println(SPIFFS.usedBytes());    
+    //ESP.wdtDisable();         //Disable watchdog timer
 }
 
 void loop() {
@@ -303,10 +308,11 @@ void loop() {
                 char *decodedRequest = str_replace(request_line,"%20"," ");
                 //GET /folder/test.txt HTTP/1.1
                 char *filename =  strcpy(decodedRequest,strstr(decodedRequest, " ")+1);
+                Serial.println("Working filename:");
                 Serial.println(filename);
                 if (strstr(request_line, "PROPFIND ") != 0) {
                     //curl --data "" --header "depth:1"  --header "Content-Type: text/xml" --request PROPFIND http://192.168.4.1/
-                    FSFile dataFile = FS.open(filename, FSFILE_READ);
+                    File dataFile = SPIFFS.open(filename, "r");
                     if (!dataFile) {
                         not_found_404(client);
                         break;
@@ -323,7 +329,7 @@ void loop() {
                 } else if (strstr(request_line, "GET ") != 0) {
                     filename = filename + 1;
                     Serial.println(filename);
-                    FSFile dataFile = FS.open(filename, FSFILE_READ);
+                    File dataFile = SPIFFS.open(filename, "r");
                     if (!dataFile) {
                         not_found_404(client);
                         break;
@@ -346,7 +352,7 @@ void loop() {
                         client.print(dataFile.size(), DEC);
                         client.println();
                         client.println();
-                        char buf[42];
+                        uint8_t buf[42];
                         int16_t num_read;
                         while (dataFile.available()) {
                             num_read = dataFile.read(buf, 42);
@@ -365,7 +371,7 @@ void loop() {
                     filename = filename + 1;
                     destination = destination + 1;
                     Serial.println(destination);
-                    if (FS.rename(filename, destination)) {
+                    if (SPIFFS.rename(filename, destination)) {
                         client.println(HTTP_201_MOVED);
                     } else {
                         client.println(HTTP_NOT_FOUND);
@@ -376,9 +382,8 @@ void loop() {
 
                 } else if (strstr(request_line, "PUT ") != 0) {
                     unsigned long content_length = readContentLength(client);
-                    readUntilBody(client);
-                    filename = filename + 1;
-                    FSFile dataFile = FS.open(filename, FSFILE_WRITE);
+                    readUntilBody(client);                                      
+                    File dataFile = SPIFFS.open(filename,  FILE_WRITE);
                     byte buf[150];
                     int num_read = 0;
                     unsigned long total_read = 0;
@@ -394,14 +399,15 @@ void loop() {
                     dataFile.close();
                     client.println(HTTP_201_CREATED);
                     client.println();
+                    Serial.println("Saved file.");
                     break;
                 } else if (strstr(request_line, "DELETE ") != 0) {
-                    FSFile dataFile = FS.open(filename, FSFILE_WRITE);
+                    File dataFile = SPIFFS.open(filename, "w");
                     if (!dataFile) {
                         not_found_404(client);
                         break;
                     }
-                    if (dataFile.remove()) {
+                    if (SPIFFS.remove(filename)) {
                         client.println(HTTP_204_NO_CONTENT);
                         client.println();
                     } else {

@@ -29,8 +29,11 @@ Password: Admin12345
 
 ## Add ESP tools to Arduino IDE
 Open Arduino IDE
+
 Preferences
+
 Set Additional Boards Manager URLs to "https://dl.espressif.com/dl/package_esp32_index.json, http://arduino.esp8266.com/stable/package_esp8266com_index.json"
+
 Open the Boards Manager and search for ESP32, click install
 
 

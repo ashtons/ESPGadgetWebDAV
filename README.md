@@ -37,4 +37,7 @@ Set Additional Boards Manager URLs to "https://dl.espressif.com/dl/package_esp32
 Open the Boards Manager and search for ESP32, click install
 
 
+## Problems install ESP tools on MacOS
+
+https://github.com/espressif/arduino-esp32/blob/master/docs/arduino-ide/mac.md
 

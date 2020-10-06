@@ -76,7 +76,7 @@ static char *str_replace(char *input, char *match, const char *substitute)
 }
 
 void ListFiles(WiFiClient client, const char *folderPath, File folder, int format) {
-    Serial.println("Getting list of files");
+    Serial.println(F("Getting list of files"));
     Serial.println(folderPath);
     client.println(MULTISTATUS_START);    
     File root = SPIFFS.open("/");
@@ -244,11 +244,11 @@ void readUntilBody(WiFiClient client) {
 void setup() {
     delay(1000);
     Serial.begin(115200);
-    Serial.println("Started");
+    Serial.println(F("Started"));
     Serial.println(default_ssid);
     Serial.println(default_password);
     if(!SPIFFS.begin(true)){
-      Serial.println("An Error has occurred while mounting SPIFFS");
+      Serial.println(F("An Error has occurred while mounting SPIFFS"));
       return;
     }
    
@@ -270,7 +270,7 @@ void setup() {
         firstInstall = 128;
         EEPROM.put(0,firstInstall);
         EEPROM.commit();
-        Serial.println("File system formatted");       
+        Serial.println(F("File system formatted"));       
         File dataFile = SPIFFS.open("test.txt", "w");
         dataFile.print("Hello World!");
         dataFile.close();
@@ -302,13 +302,12 @@ void loop() {
                     continue;
                 }
                 request_line[index] = 0;
-                Serial.println(request_line);
-                //Serial.println(request_line);
+                Serial.println(request_line);            
                 (strstr(request_line, " HTTP"))[0] = 0;
                 char *decodedRequest = str_replace(request_line,"%20"," ");
                 //GET /folder/test.txt HTTP/1.1
                 char *filename =  strcpy(decodedRequest,strstr(decodedRequest, " ")+1);
-                Serial.println("Working filename:");
+                Serial.println(F("Working filename:"));
                 Serial.println(filename);
                 if (strstr(request_line, "PROPFIND ") != 0) {
                     //curl --data "" --header "depth:1"  --header "Content-Type: text/xml" --request PROPFIND http://192.168.4.1/
@@ -399,7 +398,7 @@ void loop() {
                     dataFile.close();
                     client.println(HTTP_201_CREATED);
                     client.println();
-                    Serial.println("Saved file.");
+                    Serial.println(F("Saved file."));
                     break;
                 } else if (strstr(request_line, "DELETE ") != 0) {
                     File dataFile = SPIFFS.open(filename, "w");

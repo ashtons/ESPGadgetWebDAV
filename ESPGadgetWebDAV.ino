@@ -257,15 +257,15 @@ void setup() {
     //while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
 
     IPAddress myIP = WiFi.softAPIP();
-    Serial.print("AP IP address: ");
+    Serial.print(F("AP IP address: "));
     Serial.println(myIP);
     server.begin();
-    Serial.println("Server started.");
+    Serial.println(F("Server started."));
     EEPROM.begin(512);
     byte firstInstall = 0;
     EEPROM.get( 0, firstInstall );
     if (firstInstall != 128) {
-        Serial.println("First install, formatting filesystem");
+        Serial.println(F("First install, formatting filesystem"));
         SPIFFS.format();
         firstInstall = 128;
         EEPROM.put(0,firstInstall);
@@ -275,11 +275,11 @@ void setup() {
         dataFile.print("Hello World!");
         dataFile.close();
     } else {
-        Serial.println("Not first install, don't format");
+        Serial.println(F("Not first install, don't format"));
     }
-    Serial.print("###### Total bytes: ");
+    Serial.print(F("###### Total bytes: "));
     Serial.println(SPIFFS.totalBytes());
-    Serial.print("###### Used bytes: ");
+    Serial.print(F("###### Used bytes: "));
     Serial.println(SPIFFS.usedBytes());    
     //ESP.wdtDisable();         //Disable watchdog timer
 }

@@ -158,9 +158,6 @@ unsigned long readNextLongValue(WiFiClient client) {
 
 unsigned long readContentLength(WiFiClient client) {
   unsigned long content_length = 0;
-  byte index = 0;
-  char needle[] = "ngth:";
-  byte len = strlen(needle);
   while (client.connected()) {
     bool result = client.findUntil("ngth:", "\n");
     if (result) {
@@ -190,9 +187,6 @@ char *readToEndOfLine(WiFiClient client) {
 }
 
 char *readDestination(WiFiClient client) {
-  byte index = 0;
-  char needle[] = "tion:";
-  byte len = strlen(needle);
   while (client.connected()) {
     bool result = client.findUntil("tion:", "\n");
     if (result) {
@@ -204,8 +198,7 @@ char *readDestination(WiFiClient client) {
 }
 
 void readUntilBody(WiFiClient client) {
-  //Read until \r\n\r\n
-  byte index = 0;
+  //Read until \r\n\r\n  
   while (client.connected()) {
     bool result = client.findUntil("\r\n\r\n", "\r\n\r\n");
     if (result) {

@@ -19,12 +19,18 @@ Password: Admin12345
 
 ###Sample queries
 
+#### Get a list of files
     curl -v --data "" --header "depth:1"  --header "Content-Type: text/xml" --request PROPFIND http://192.168.4.1/
   
-  
+ 
+#### Download a file 
     curl -v "http://192.168.4.1/test.txt"
 
+#### Upload a file
+    curl -T test.txt http://192.168.4.1/test.txt
 
+#### Move/Rename a file
+    curl -X MOVE --header 'Destination: http://192.168.4.1/new_name.txt' 'http://192.168.4.1/test.txt'
 
 
 ## Add ESP tools to Arduino IDE

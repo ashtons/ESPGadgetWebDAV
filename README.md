@@ -1,7 +1,7 @@
 # ESPGadgetWebDAV
 WebDAV server running on an ESP32 wifi module
 
-In development, currently supports basic PROPFIND, MOVE, DELETE, PUT and GET requests
+Currently supports basic PROPFIND, MOVE, DELETE, PUT and GET requests
 
 Uses SPIFFS filesystem, formats filesystem on initial run.
 

@@ -23,7 +23,7 @@ FLASH_TEXT(HTTP_207_FOUND) = "HTTP/1.1 207 Multi Status";
 FLASH_TEXT(HTTP_408_REQUEST_TIMEOUT) = "HTTP/1.1 408 Request Timeout";
 FLASH_TEXT(HTTP_405_METHOD_NOT_ALLOWED) = "HTTP/1.1 405 Method Not Allowed";
 FLASH_TEXT(HTTP_500_INTERNAL_SERVER_ERROR) = "HTTP/1.1 500 Internal Server Error";
-FLASH_TEXT(HTTP_OPTIONS_HEADERS) = "Allow: PROPFIND, GET, DELETE, PUT, MOVE\nDAV: 1, 2";
+FLASH_TEXT(HTTP_OPTIONS_HEADERS) = "Allow: PROPFIND, GET, DELETE, PUT, MOVE\r\nDAV: 1, 2";
 
 FLASH_TEXT(HTTP_XML_CONTENT) = "Content-Type: application/xml;";
 FLASH_TEXT(HTTP_HTML_CONTENT) = "Content-Type: text/html";
@@ -98,49 +98,58 @@ static char *str_replace(char *input, char *match, const char *substitute)
   return replaceBuffer;
 }
 
-void ListFiles(WiFiClient client, const char *folderPath, File folder, int format) {
+String BuildFileListXml(const char *folderPath) {
   Serial.println(F("Getting list of files"));
   Serial.println(folderPath);
-  client.println(MULTISTATUS_START);
+  String response = MULTISTATUS_START;
   File root = SPIFFS.open("/");
   File entry = root.openNextFile();
   if (!entry) {
     Serial.println("No files found");
   }
   while (entry) {
-    client.print(RESPONSE_START);
-    client.print(HREF_START);
+    response += RESPONSE_START;
+    response += HREF_START;
     //client.print(folderPath);
-    client.print(entry.name());
+    response += entry.name();
     //entry.printName(&client);
-    client.print(HREF_END);
-    client.print(PROPSTAT_START);
-    client.print(PROP_START);
+    response += HREF_END;
+    response += PROPSTAT_START;
+    response += PROP_START;
     if (entry.isDirectory()) {
-      client.print(RESOURCETYPE_START);
-      client.print(RESOURCE_COLLECTION);
-      client.print(RESOURCETYPE_END);
+      response += RESOURCETYPE_START;
+      response += RESOURCE_COLLECTION;
+      response += RESOURCETYPE_END;
     } else {
-      client.print(CONTENTLEN_START);
-      client.print(entry.size(), DEC);
-      client.print(CONTENTLEN_END);
+      response += CONTENTLEN_START;
+      response += String(entry.size(), DEC);
+      response += CONTENTLEN_END;
     }
-    client.print(MODDATE_START);
+    response += MODDATE_START;
     //entry.printModifyDateTime(&client);
-    client.print(MODDATE_END);
-    client.print(CREATEDATE_START);
+    response += MODDATE_END;
+    response += CREATEDATE_START;
     //entry.printCreateDateTime(&client);
-    client.print(CREATEDATE_END);
-    client.print(PROP_END);
-    client.print(STATUS_OK);
-    client.print(PROPSTAT_END);
-    client.print(RESPONSE_END);
+    response += CREATEDATE_END;
+    response += PROP_END;
+    response += STATUS_OK;
+    response += PROPSTAT_END;
+    response += RESPONSE_END;
 
     entry.close();
     entry = root.openNextFile();
   }
-  client.println(MULTISTATUS_END);
+  response += MULTISTATUS_END;
+  return response;
+}
 
+void sendXmlResponse(WiFiClient client, const char *status, const String &body) {
+  client.println(status);
+  client.println(HTTP_XML_CONTENT);
+  client.print(HTTP_CONTENT_LENGTH);
+  client.println(body.length());
+  client.println();
+  client.print(body);
 }
 
 
@@ -318,10 +327,8 @@ void loop() {
             break;
           }
           if (dataFile.isDirectory()) {
-            client.println(HTTP_207_FOUND);
-            client.println(HTTP_XML_CONTENT);
-            client.println("");
-            ListFiles(client, filename, dataFile, 0);
+            String response = BuildFileListXml(filename);
+            sendXmlResponse(client, HTTP_207_FOUND, response);
           } else {
             not_allowed_405(client);
           }
@@ -335,7 +342,8 @@ void loop() {
             break;
           }
           if (dataFile.isDirectory()) {
-            ListFiles(client, filename, dataFile, 1);
+            String response = BuildFileListXml(filename);
+            sendXmlResponse(client, HTTP_207_FOUND, response);
           } else {
             client.println(HTTP_200_FOUND);
             client.print(HTTP_CONTENT_TYPE);
@@ -436,6 +444,8 @@ void loop() {
         } else if (strstr(request_line, "OPTIONS ") != 0) {
           client.println(HTTP_200_FOUND);
           client.println(HTTP_OPTIONS_HEADERS);
+          client.print(HTTP_CONTENT_LENGTH);
+          client.println(0);
           client.println();
         } else {
           not_allowed_405(client);

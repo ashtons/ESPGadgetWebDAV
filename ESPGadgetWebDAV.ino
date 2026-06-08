@@ -367,18 +367,18 @@ void loop() {
           Serial.println(F("Saved file."));
           break;
         } else if (strstr(request_line, "DELETE ") != 0) {
-          File dataFile = SPIFFS.open(filename, "w");
+          File dataFile = SPIFFS.open(filename, "r");
           if (!dataFile) {
             not_found_404(client);
             break;
           }
+          dataFile.close();
           if (SPIFFS.remove(filename)) {
             client.println(HTTP_204_NO_CONTENT);
             client.println();
           } else {
             not_found_404(client);
           }
-          dataFile.close();
         } else if (strstr(request_line, "OPTIONS ") != 0) {
           client.println(HTTP_200_FOUND);
           client.println(HTTP_OPTIONS_HEADERS);

@@ -7,6 +7,7 @@
 #define FLASH_TEXT(name)   const char *name
 #define BUFFER_SIZE 110
 #define MAX_STRING 60
+#define PUT_READ_TIMEOUT_MS 5000
 
 const char *default_ssid = "ESPGadget";
 const char *default_password = "Admin12345";
@@ -19,6 +20,7 @@ FLASH_TEXT(HTTP_201_CREATED) = "HTTP/1.1 201 CREATED";
 FLASH_TEXT(HTTP_201_MOVED) = "HTTP/1.1 201 MOVED";
 FLASH_TEXT(HTTP_204_NO_CONTENT) = "HTTP/1.1 204 No Content";
 FLASH_TEXT(HTTP_207_FOUND) = "HTTP/1.1 207 Multi Status";
+FLASH_TEXT(HTTP_408_REQUEST_TIMEOUT) = "HTTP/1.1 408 Request Timeout";
 FLASH_TEXT(HTTP_405_METHOD_NOT_ALLOWED) = "HTTP/1.1 405 Method Not Allowed";
 FLASH_TEXT(HTTP_OPTIONS_HEADERS) = "Allow: PROPFIND, GET, DELETE, PUT, MOVE\nDAV: 1, 2";
 
@@ -384,16 +386,30 @@ void loop() {
           byte buf[150];
           int num_read = 0;
           unsigned long total_read = 0;
-          while (total_read < content_length) {
+          unsigned long last_read_time = millis();
+          bool upload_failed = false;
+          while (total_read < content_length && !upload_failed) {
             num_read = client.read(buf, 150);
             if (num_read > 0) {
               dataFile.write(buf, num_read);
               total_read = total_read + num_read;
+              last_read_time = millis();
             } else {
+              if (!client.connected() || millis() - last_read_time > PUT_READ_TIMEOUT_MS) {
+                upload_failed = true;
+                break;
+              }
               delay(1);
             }
           }
           dataFile.close();
+          if (upload_failed) {
+            SPIFFS.remove(filename);
+            client.println(HTTP_408_REQUEST_TIMEOUT);
+            client.println();
+            Serial.println(F("Upload failed."));
+            break;
+          }
           client.println(HTTP_201_CREATED);
           client.println();
           Serial.println(F("Saved file."));

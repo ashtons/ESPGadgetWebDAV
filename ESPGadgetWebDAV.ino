@@ -269,10 +269,20 @@ void loop() {
         }
         request_line[index] = 0;
         Serial.println(request_line);
-        (strstr(request_line, " HTTP"))[0] = 0;
+        char *protocol_start = strstr(request_line, " HTTP");
+        if (protocol_start == 0) {
+          not_allowed_405(client);
+          break;
+        }
+        protocol_start[0] = 0;
         char *decodedRequest = str_replace(request_line, "%20", " ");
         //GET /folder/test.txt HTTP/1.1
-        char *filename =  strcpy(decodedRequest, strstr(decodedRequest, " ") + 1);
+        char *path_start = strstr(decodedRequest, " ");
+        if (path_start == 0 || path_start[1] == 0) {
+          not_allowed_405(client);
+          break;
+        }
+        char *filename =  strcpy(decodedRequest, path_start + 1);
         Serial.println(F("Working filename:"));
         Serial.println(filename);
         if (strstr(request_line, "PROPFIND ") != 0) {

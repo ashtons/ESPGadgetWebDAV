@@ -62,16 +62,36 @@ char currentLineBuffer[MAX_STRING];
 
 static char *str_replace(char *input, char *match, const char *substitute)
 {
-  byte offset = 0;
+  size_t offset = 0;
+  const size_t maxOffset = MAX_STRING - 1;
   char *search;
-  while (search = strstr(input, match)) {
-    memcpy(replaceBuffer + offset, input, search - input);
-    offset += search - input;
+  while ((search = strstr(input, match)) && offset < maxOffset) {
+    size_t segmentLength = search - input;
+    if (segmentLength > maxOffset - offset) {
+      segmentLength = maxOffset - offset;
+    }
+    memcpy(replaceBuffer + offset, input, segmentLength);
+    offset += segmentLength;
+    if (offset >= maxOffset) {
+      break;
+    }
     input = search + strlen(match);
-    memcpy(replaceBuffer + offset, substitute, strlen(substitute));
-    offset += strlen(substitute);
+    size_t substituteLength = strlen(substitute);
+    if (substituteLength > maxOffset - offset) {
+      substituteLength = maxOffset - offset;
+    }
+    memcpy(replaceBuffer + offset, substitute, substituteLength);
+    offset += substituteLength;
   }
-  strcpy(replaceBuffer + offset, input);
+  if (offset < maxOffset) {
+    size_t remainingLength = strlen(input);
+    if (remainingLength > maxOffset - offset) {
+      remainingLength = maxOffset - offset;
+    }
+    memcpy(replaceBuffer + offset, input, remainingLength);
+    offset += remainingLength;
+  }
+  replaceBuffer[offset] = 0;
   return replaceBuffer;
 }
 
@@ -140,10 +160,9 @@ unsigned long readNextLongValue(WiFiClient client) {
   while (client.connected()) {
     char c = client.read();
     if (c != ' ' && c != '\n' && c != '\r') {
-      rest_of_line[index] = c;
-      index++;
-      if (index >= 10) {
-        break;
+      if (index < sizeof(rest_of_line) - 1) {
+        rest_of_line[index] = c;
+        index++;
       }
       continue;
     } else if (c == '\r') {
@@ -175,14 +194,17 @@ char *readToEndOfLine(WiFiClient client) {
   while (client.connected()) {
     char c = client.read();
     if (c != '\n' && c != '\r') {
-      currentLineBuffer[index] = c;
-      index++;
+      if (index < MAX_STRING - 1) {
+        currentLineBuffer[index] = c;
+        index++;
+      }
       continue;
     } else {
       currentLineBuffer[index] = 0;
       break;
     }
   }
+  currentLineBuffer[index] = 0;
   return currentLineBuffer;
 }
 

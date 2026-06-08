@@ -22,6 +22,7 @@ FLASH_TEXT(HTTP_204_NO_CONTENT) = "HTTP/1.1 204 No Content";
 FLASH_TEXT(HTTP_207_FOUND) = "HTTP/1.1 207 Multi Status";
 FLASH_TEXT(HTTP_408_REQUEST_TIMEOUT) = "HTTP/1.1 408 Request Timeout";
 FLASH_TEXT(HTTP_405_METHOD_NOT_ALLOWED) = "HTTP/1.1 405 Method Not Allowed";
+FLASH_TEXT(HTTP_500_INTERNAL_SERVER_ERROR) = "HTTP/1.1 500 Internal Server Error";
 FLASH_TEXT(HTTP_OPTIONS_HEADERS) = "Allow: PROPFIND, GET, DELETE, PUT, MOVE\nDAV: 1, 2";
 
 FLASH_TEXT(HTTP_XML_CONTENT) = "Content-Type: application/xml;";
@@ -383,6 +384,11 @@ void loop() {
           unsigned long content_length = readContentLength(client);
           readUntilBody(client);
           File dataFile = SPIFFS.open(filename,  FILE_WRITE);
+          if (!dataFile) {
+            client.println(HTTP_500_INTERNAL_SERVER_ERROR);
+            client.println();
+            break;
+          }
           byte buf[150];
           int num_read = 0;
           unsigned long total_read = 0;

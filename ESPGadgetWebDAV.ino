@@ -321,7 +321,7 @@ void loop() {
             int16_t num_read;
             while (dataFile.available()) {
               num_read = dataFile.read(buf, 42);
-              client.write(&buf[0], 42);
+              client.write(&buf[0], num_read);
             }
           }
           dataFile.close();

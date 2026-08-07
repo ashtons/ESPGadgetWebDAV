@@ -8,10 +8,21 @@
 #define MAX_STRING 60
 #define PUT_READ_TIMEOUT_MS 5000
 
-const char *default_ssid = "ESPGadget";
-const char *default_password = "Admin12345";
+FLASH_TEXT(default_ssid) = "ESPGadget";
+FLASH_TEXT(default_password) = "Admin12345";
 char stored_ssid[32];
 char stored_password[32];
+
+const bool REQUIRE_AUTH = true; // set to false to disable Basic Auth 
+const char *auth_username = "admin";
+const char *auth_password = "changeme"; // set a real password
+
+struct RequestHeaders
+{
+    bool authOk;
+    unsigned long contentLength;
+    char destination[MAX_STRING];
+};
 
 FLASH_TEXT(HTTP_NOT_FOUND) = "HTTP/1.1 404 Not Found";
 FLASH_TEXT(HTTP_200_FOUND) = "HTTP/1.1 200 OK";
@@ -21,6 +32,8 @@ FLASH_TEXT(HTTP_204_NO_CONTENT) = "HTTP/1.1 204 No Content";
 FLASH_TEXT(HTTP_207_FOUND) = "HTTP/1.1 207 Multi Status";
 FLASH_TEXT(HTTP_408_REQUEST_TIMEOUT) = "HTTP/1.1 408 Request Timeout";
 FLASH_TEXT(HTTP_405_METHOD_NOT_ALLOWED) = "HTTP/1.1 405 Method Not Allowed";
+FLASH_TEXT(HTTP_401_UNAUTHORIZED) = "HTTP/1.1 401 Unauthorized";
+FLASH_TEXT(HTTP_WWW_AUTHENTICATE) = "WWW-Authenticate: Basic realm=\"ESPGadgetWebDAV\"";
 FLASH_TEXT(HTTP_500_INTERNAL_SERVER_ERROR) = "HTTP/1.1 500 Internal Server Error";
 FLASH_TEXT(HTTP_OPTIONS_HEADERS) = "Allow: PROPFIND, GET, DELETE, PUT, MOVE\r\nDAV: 1, 2";
 
@@ -100,6 +113,36 @@ static char *str_replace(char *input, char *match, const char *substitute)
     return replaceBuffer;
 }
 
+static bool base64Decode(const char *input, char *output, size_t outputSize)
+{
+    static const char *alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    size_t outIndex = 0;
+    int bitBuffer = 0;
+    int bitCount = 0;
+    for (const char *p = input; *p && *p != '='; p++)
+    {
+        const char *pos = strchr(alphabet, *p);
+        if (pos == 0)
+        {
+            continue; // skip whitespace/unexpected characters
+        }
+        int value = pos - alphabet;
+        bitBuffer = (bitBuffer << 6) | value;
+        bitCount += 6;
+        if (bitCount >= 8)
+        {
+            bitCount -= 8;
+            if (outIndex >= outputSize - 1)
+            {
+                return false;
+            }
+            output[outIndex++] = (char)((bitBuffer >> bitCount) & 0xFF);
+        }
+    }
+    output[outIndex] = 0;
+    return true;
+}
+
 String BuildFileListXml(const char *folderPath)
 {
     Serial.println(F("Getting list of files"));
@@ -174,101 +217,89 @@ void not_allowed_405(WiFiClient client)
     client.println();
 }
 
-unsigned long readNextLongValue(WiFiClient client)
-{
-    char rest_of_line[10];
-    byte index = 0;
-    unsigned long result = 0;
-    while (client.connected())
-    {
-        char c = client.read();
-        if (c != ' ' && c != '\n' && c != '\r')
-        {
-            if (index < sizeof(rest_of_line) - 1)
-            {
-                rest_of_line[index] = c;
-                index++;
-            }
-            continue;
-        }
-        else if (c == '\r')
-        {
-            client.read(); //\n
-            break;
-        }
-    }
-    rest_of_line[index] = 0;
-    result = atol(rest_of_line);
-    return result;
-}
-
-unsigned long readContentLength(WiFiClient client)
-{
-    unsigned long content_length = 0;
-    while (client.connected())
-    {
-        bool result = client.findUntil("ngth:", "\n");
-        if (result)
-        {
-            break;
-        }
-    }
-    content_length = readNextLongValue(client);
-    Serial.println(content_length);
-    return content_length;
-}
-
 char *readToEndOfLine(WiFiClient client)
 {
     byte index = 0;
-    index = 0;
     while (client.connected())
     {
         char c = client.read();
-        if (c != '\n' && c != '\r')
+        if (c == '\r')
         {
-            if (index < MAX_STRING - 1)
-            {
-                currentLineBuffer[index] = c;
-                index++;
-            }
-            continue;
+            continue; // ignore CR, the line is terminated by LF below
         }
-        else
+        if (c == '\n')
         {
-            currentLineBuffer[index] = 0;
             break;
+        }
+        if (index < MAX_STRING - 1)
+        {
+            currentLineBuffer[index] = c;
+            index++;
         }
     }
     currentLineBuffer[index] = 0;
     return currentLineBuffer;
 }
 
-char *readDestination(WiFiClient client)
+RequestHeaders readHeaders(WiFiClient client)
 {
-    while (client.connected())
-    {
-        bool result = client.findUntil("tion:", "\n");
-        if (result)
-        {
-            break;
-        }
-    }
-    client.read(); // space
-    return readToEndOfLine(client);
-}
+    RequestHeaders headers;
+    headers.authOk = !REQUIRE_AUTH;
+    headers.contentLength = 0;
+    headers.destination[0] = 0;
 
-void readUntilBody(WiFiClient client)
-{
-    // Read until \r\n\r\n
+    char decodedAuth[MAX_STRING];
+    char expectedAuth[MAX_STRING];
+    snprintf(expectedAuth, sizeof(expectedAuth), "%s:%s", auth_username, auth_password);
+
     while (client.connected())
     {
-        bool result = client.findUntil("\r\n\r\n", "\r\n\r\n");
-        if (result)
+        char *line = readToEndOfLine(client);
+        if (line[0] == 0)
         {
-            break;
+            break; // blank line marks the end of the headers
+        }
+        if (strncasecmp(line, "Authorization:", 14) == 0)
+        {
+            char *value = line + 14;
+            while (*value == ' ')
+            {
+                value++;
+            }
+            if (strncasecmp(value, "Basic ", 6) == 0)
+            {
+                value += 6;
+                while (*value == ' ')
+                {
+                    value++;
+                }
+                if (base64Decode(value, decodedAuth, sizeof(decodedAuth)) && strcmp(decodedAuth, expectedAuth) == 0)
+                {
+                    headers.authOk = true;
+                }
+            }
+        }
+        else if (strncasecmp(line, "Content-Length:", 15) == 0)
+        {
+            char *value = line + 15;
+            while (*value == ' ')
+            {
+                value++;
+            }
+            headers.contentLength = atol(value);
+        }
+        else if (strncasecmp(line, "Destination:", 12) == 0)
+        {
+            char *value = line + 12;
+            while (*value == ' ')
+            {
+                value++;
+            }
+            strncpy(headers.destination, value, MAX_STRING - 1);
+            headers.destination[MAX_STRING - 1] = 0;
         }
     }
+    return headers;
 }
 
 void setup()
@@ -362,6 +393,18 @@ void loop()
                 char *filename = strcpy(decodedRequest, path_start + 1);
                 Serial.println(F("Working filename:"));
                 Serial.println(filename);
+                if (client.peek() == '\n')
+                {
+                    client.read(); // consume the LF left over from the request line's CRLF
+                }
+                RequestHeaders headers = readHeaders(client);
+                if (!headers.authOk)
+                {
+                    client.println(HTTP_401_UNAUTHORIZED);
+                    client.println(HTTP_WWW_AUTHENTICATE);
+                    client.println();
+                    break;
+                }
                 if (strstr(request_line, "PROPFIND ") != 0)
                 {
                     // curl --data "" --header "depth:1"  --header "Content-Type: text/xml" --request PROPFIND http://192.168.4.1/
@@ -433,7 +476,7 @@ void loop()
                 }
                 else if (strstr(request_line, "MOVE ") != 0)
                 {
-                    char *destination = readDestination(client);
+                    char *destination = headers.destination;
 
                     Serial.println(destination);
                     if (strncmp(destination, "http", 4) == 0)
@@ -458,8 +501,7 @@ void loop()
                 }
                 else if (strstr(request_line, "PUT ") != 0)
                 {
-                    unsigned long content_length = readContentLength(client);
-                    readUntilBody(client);
+                    unsigned long content_length = headers.contentLength;
                     File dataFile = SPIFFS.open(filename, FILE_WRITE);
                     if (!dataFile)
                     {
